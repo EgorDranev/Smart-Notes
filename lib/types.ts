@@ -11,4 +11,5 @@ export type BookmarkItem = {
 export type BookmarkResponse = {
   items: BookmarkItem[];
   tags: string[];
+  semanticSearchEnabled: boolean;
 };

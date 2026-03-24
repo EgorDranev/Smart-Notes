@@ -4,7 +4,7 @@ CREATE TABLE "Bookmark" (
     "title" TEXT NOT NULL,
     "note" TEXT NOT NULL,
     "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "embedding" JSONB NOT NULL,
+    "embedding" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

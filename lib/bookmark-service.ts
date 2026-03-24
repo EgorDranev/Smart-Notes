@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { fetchPageTitle } from "@/lib/metadata";
-import { getEmbeddingModel, getOpenAIClient } from "@/lib/openai";
+import { getEmbeddingModel, getOpenAIClient, isOpenAIConfigured } from "@/lib/openai";
 import type { BookmarkItem } from "@/lib/types";
 
 type CreateBookmarkInput = {
@@ -17,7 +17,7 @@ type BookmarkWithEmbedding = {
   note: string;
   tags: string[];
   createdAt: Date;
-  embedding: Prisma.JsonValue;
+  embedding: Prisma.JsonValue | null;
 };
 
 function normalizeTags(tags: string) {
@@ -34,6 +34,10 @@ function buildEmbeddingInput(input: { title: string; note: string; tags: string[
 }
 
 async function createEmbedding(text: string) {
+  if (!isOpenAIConfigured()) {
+    return null;
+  }
+
   const client = getOpenAIClient();
   const response = await client.embeddings.create({
     model: getEmbeddingModel(),
@@ -43,7 +47,7 @@ async function createEmbedding(text: string) {
   return response.data[0]?.embedding ?? [];
 }
 
-function extractVector(value: Prisma.JsonValue): number[] {
+function extractVector(value: Prisma.JsonValue | null): number[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -124,16 +128,48 @@ export async function listBookmarks(tag?: string) {
   return items.map((item) => mapBookmark(item));
 }
 
+function textScore(item: { title: string; note: string; tags: string[]; url: string }, query: string) {
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter(Boolean);
+
+  if (terms.length === 0) {
+    return 0;
+  }
+
+  const haystack = [item.title, item.note, item.tags.join(" "), item.url].join(" ").toLowerCase();
+  const matchedTerms = terms.filter((term) => haystack.includes(term)).length;
+
+  return matchedTerms / terms.length;
+}
+
 export async function searchBookmarks(query: string, tag?: string) {
-  const queryEmbedding = await createEmbedding(query);
   const items = await db.bookmark.findMany({
     where: tag ? { tags: { has: tag } } : undefined,
     orderBy: { createdAt: "desc" }
   });
 
+  if (!isOpenAIConfigured()) {
+    return items
+      .map((item) => {
+        const score = textScore(item, query);
+        return {
+          ...mapBookmark(item, score),
+          score
+        };
+      })
+      .filter((item) => item.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .map(({ score: _score, ...item }) => item);
+  }
+
+  const queryEmbedding = await createEmbedding(query);
+
   return items
     .map((item) => {
-      const score = cosineSimilarity(queryEmbedding, extractVector(item.embedding));
+      const score = cosineSimilarity(queryEmbedding ?? [], extractVector(item.embedding));
       return {
         ...mapBookmark(item, score),
         score
@@ -153,4 +189,10 @@ export async function getAllTags() {
   return [...new Set(result.flatMap((item) => item.tags))].sort((left, right) =>
     left.localeCompare(right)
   );
+}
+
+export function getSearchMode() {
+  return {
+    semanticSearchEnabled: isOpenAIConfigured()
+  };
 }

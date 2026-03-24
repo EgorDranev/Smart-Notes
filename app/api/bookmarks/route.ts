@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createBookmark,
   getAllTags,
+  getSearchMode,
   listBookmarks,
   searchBookmarks
 } from "@/lib/bookmark-service";
@@ -13,8 +14,9 @@ export async function GET(request: NextRequest) {
 
     const items = query ? await searchBookmarks(query, tag) : await listBookmarks(tag);
     const tags = await getAllTags();
+    const mode = getSearchMode();
 
-    return NextResponse.json({ items, tags });
+    return NextResponse.json({ items, tags, ...mode });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error";
     return NextResponse.json({ error: message }, { status: 500 });

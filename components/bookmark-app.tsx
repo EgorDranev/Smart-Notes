@@ -14,6 +14,7 @@ export function BookmarkApp() {
   const [tags, setTags] = useState<string[]>([]);
   const [selectedTag, setSelectedTag] = useState("");
   const [query, setQuery] = useState("");
+  const [semanticSearchEnabled, setSemanticSearchEnabled] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(
     null
@@ -42,6 +43,7 @@ export function BookmarkApp() {
     const data = (await response.json()) as BookmarkResponse;
     setItems(data.items);
     setTags(data.tags);
+    setSemanticSearchEnabled(data.semanticSearchEnabled);
   }
 
   useEffect(() => {
@@ -72,7 +74,12 @@ export function BookmarkApp() {
     }
 
     setForm(initialForm);
-    setFeedback({ tone: "success", text: "Bookmark saved and embedded successfully." });
+    setFeedback({
+      tone: "success",
+      text: semanticSearchEnabled
+        ? "Bookmark saved and embedded successfully."
+        : "Bookmark saved successfully."
+    });
 
     startTransition(() => {
       loadBookmarks().catch((error: Error) => {
@@ -110,7 +117,7 @@ export function BookmarkApp() {
           <h2>Add bookmark</h2>
           <p className="panel-copy">
             Paste a URL, add context, and separate tags with commas. The server fetches the page
-            title and creates an embedding for semantic search.
+            title and uses OpenAI embeddings only when they are configured.
           </p>
           <form className="stack" onSubmit={onSubmit}>
             <div className="field">
@@ -168,7 +175,11 @@ export function BookmarkApp() {
               {feedback.text}
             </p>
           ) : (
-            <p className="hint">OpenAI key stays on the server in environment variables.</p>
+            <p className="hint">
+              {semanticSearchEnabled
+                ? "Semantic search is enabled. The OpenAI key stays on the server."
+                : "OpenAI is not configured, so search uses a text fallback."}
+            </p>
           )}
         </div>
       </aside>
@@ -177,7 +188,12 @@ export function BookmarkApp() {
         <div className="panel-inner">
           <h2>Search and browse</h2>
           <p className="panel-copy">
-            Search in natural language, filter by tag, and see semantic similarity on each result.
+            Search in natural language, filter by tag, and see relevance on each result.
+          </p>
+          <p className="hint">
+            {semanticSearchEnabled
+              ? "Results are ranked by embedding similarity."
+              : "Results are ranked by title, note, tags, and URL text matches."}
           </p>
 
           <form className="toolbar" onSubmit={onSearchSubmit}>
@@ -238,7 +254,9 @@ export function BookmarkApp() {
                       </div>
                     </div>
                     {item.similarity !== null ? (
-                      <div className="result-score">{Math.round(item.similarity * 100)}% match</div>
+                      <div className="result-score">
+                        {Math.round(item.similarity * 100)}% {semanticSearchEnabled ? "match" : "text match"}
+                      </div>
                     ) : null}
                   </div>
                   <p>{item.note}</p>
