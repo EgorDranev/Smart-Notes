@@ -4,7 +4,7 @@ import { DM_Sans, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 
 const bodyFont = DM_Sans({
-  subsets: ["latin", "cyrillic"],
+  subsets: ["latin"],
   variable: "--font-body"
 });
 
