@@ -114,7 +114,7 @@ export async function createBookmark(input: CreateBookmarkInput) {
       title,
       note: input.note.trim(),
       tags,
-      embedding
+      ...(embedding ? { embedding } : {})
     }
   });
 }
